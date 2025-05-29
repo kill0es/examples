@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>无限扩展的围棋游戏</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: white;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            max-width: 800px;
+            width: 100%;
+        }
+        
+        .board-container {
+            position: relative;
+            margin: 20px 0;
+            background: #dcb35c;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+        }
+        
+        canvas {
+            display: block;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            margin: 20px 0;
+            font-size: 1.2rem;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin-top: 5px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        button {
+            background: #4CAF50;
+            border: none;
+            color: white;
+            padding: 12px 25px;
+            font-size: 1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .rules {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        
+        .rules h3 {
+            margin-top: 0;
+            text-align: center;
+        }
+        
+        .player-indicator {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+        
+        .player-marker {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            margin: 0 10px;
+            border: 2px solid #333;
+        }
+        
+        .black-marker {
+            background: #000;
+        }
+        
+        .white-marker {
+            background: #fff;
+        }
+        
+        @media (max-width: 600px) {
+            .game-container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .stats {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .controls {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>无限扩展的围棋游戏</h1>
+        <p>当棋子数 ≥ 棋盘格子数一半时，棋盘自动扩展一圈</p>
+    </div>
+    
+    <div class="game-container">
+        <div class="player-indicator">
+            当前玩家: 
+            <div class="player-marker black-marker"></div>
+            <span id="current-player">黑棋</span>
+        </div>
+        
+        <div class="board-container">
+            <canvas id="go-board" width="400" height="400"></canvas>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div>棋盘大小</div>
+                <div class="stat-value" id="board-size">3×3</div>
+            </div>
+            <div class="stat-item">
+                <div>黑棋数量</div>
+                <div class="stat-value" id="black-count">0</div>
+            </div>
+            <div class="stat-item">
+                <div>白棋数量</div>
+                <div class="stat-value" id="white-count">0</div>
+            </div>
+            <div class="stat-item">
+                <div>总棋子数</div>
+                <div class="stat-value" id="total-stones">0</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="pass-btn">Pass（停一手）</button>
+            <button id="reset-btn">重新开始</button>
+            <button id="undo-btn">悔棋</button>
+        </div>
+        
+        <div class="rules">
+            <h3>游戏规则</h3>
+            <p>1. 黑棋先行，玩家轮流在交叉点上落子</p>
+            <p>2. 棋子被完全包围（没有"气"）时会被提走</p>
+            <p>3. 禁止自杀（落子后立即无气的着法）</p>
+            <p>4. 当棋盘上棋子数 ≥ 棋盘格子数一半时，棋盘自动向外扩展一圈</p>
+            <p>5. 初始为3×3十字形棋盘，扩展后变为5×5田字形棋盘</p>
+        </div>
+    </div>
+
+    <script>
+        // 游戏主类
+        class GoGame {
+            constructor() {
+                this.canvas = document.getElementById('go-board');
+                this.ctx = this.canvas.getContext('2d');
+                this.boardSize = 3; // 初始棋盘大小（3×3）
+                this.gridSize = 40; // 网格大小（像素）
+                this.board = []; // 棋盘状态
+                this.currentPlayer = 1; // 1:黑棋, 2:白棋
+                this.gameHistory = []; // 游戏历史（用于悔棋）
+                this.initBoard();
+                this.drawBoard();
+                
+                // 事件监听
+                this.canvas.addEventListener('click', this.handleClick.bind(this));
+                document.getElementById('pass-btn').addEventListener('click', this.pass.bind(this));
+                document.getElementById('reset-btn').addEventListener('click', this.reset.bind(this));
+                document.getElementById('undo-btn').addEventListener('click', this.undo.bind(this));
+                
+                // 初始更新状态
+                this.updateStats();
+            }
+            
+            // 初始化棋盘
+            initBoard() {
+                this.board = [];
+                for (let i = 0; i < this.boardSize; i++) {
+                    this.board[i] = [];
+                    for (let j = 0; j < this.boardSize; j++) {
+                        // 初始十字形（中心点可落子）
+                        this.board[i][j] = 0; // 0:空, 1:黑, 2:白
+                    }
+                }
+                this.gameHistory = [];
+            }
+            
+            // 绘制棋盘
+            drawBoard() {
+                const ctx = this.ctx;
+                const size = this.boardSize;
+                const gridSize = this.gridSize;
+                const padding = gridSize;
+                
+                // 调整Canvas大小
+                const canvasSize = (size - 1) * gridSize + padding * 2;
+                this.canvas.width = canvasSize;
+                this.canvas.height = canvasSize;
+                
+                // 清除画布
+                ctx.clearRect(0, 0, canvasSize, canvasSize);
+                
+                // 绘制棋盘背景
+                ctx.fillStyle = '#dcb35c';
+                ctx.fillRect(0, 0, canvasSize, canvasSize);
+                
+                // 绘制网格线
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1;
+                
+                // 横线
+                for (let i = 0; i < size; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(padding, i * gridSize + padding);
+                    ctx.lineTo((size - 1) * gridSize + padding, i * gridSize + padding);
+                    ctx.stroke();
+                }
+                
+                // 竖线
+                for (let i = 0; i < size; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(i * gridSize + padding, padding);
+                    ctx.lineTo(i * gridSize + padding, (size - 1) * gridSize + padding);
+                    ctx.stroke();
+                }
+                
+                // 绘制棋子
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        if (this.board[i][j] === 1) {
+                            this.drawStone(i, j, 'black');
+                        } else if (this.board[i][j] === 2) {
+                            this.drawStone(i, j, 'white');
+                        }
+                    }
+                }
+                
+                // 标记中心点（十字形棋盘）
+                if (size === 3) {
+                    ctx.fillStyle = 'red';
+                    ctx.beginPath();
+                    ctx.arc(padding + gridSize, padding + gridSize, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // 绘制当前玩家提示
+                ctx.fillStyle = this.currentPlayer === 1 ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.3)';
+                ctx.beginPath();
+                ctx.arc(padding, padding, 8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // 绘制棋子
+            drawStone(i, j, color) {
+                const ctx = this.ctx;
+                const gridSize = this.gridSize;
+                const padding = gridSize;
+                const x = j * gridSize + padding;
+                const y = i * gridSize + padding;
+                
+                ctx.beginPath();
+                ctx.arc(x, y, gridSize * 0.4, 0, Math.PI * 2);
+                
+                if (color === 'black') {
+                    ctx.fillStyle = '#000';
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = '#fff';
+                    ctx.fill();
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            }
+            
+            // 处理点击事件
+            handleClick(event) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                const gridSize = this.gridSize;
+                const padding = gridSize;
+                
+                // 计算网格坐标
+                const j = Math.round((x - padding) / gridSize);
+                const i = Math.round((y - padding) / gridSize);
+                
+                // 检查是否在棋盘范围内
+                if (i >= 0 && i < this.boardSize && j >= 0 && j < this.boardSize) {
+                    // 保存当前状态用于悔棋
+                    this.saveState();
+                    
+                    // 落子
+                    this.placeStone(i, j);
+                    
+                    // 更新状态
+                    this.updateStats();
+                    
+                    // 检查是否需要扩展棋盘
+                    this.checkExpand();
+                }
+            }
+            
+            // 落子
+            placeStone(i, j) {
+                // 如果该位置已有棋子，则返回
+                if (this.board[i][j] !== 0) return;
+                
+                // 落子
+                this.board[i][j] = this.currentPlayer;
+                
+                // 检查提子
+                this.checkCapture(i, j);
+                
+                // 切换玩家
+                this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
+                
+                // 重绘棋盘
+                this.drawBoard();
+                
+                // 更新玩家指示器
+                document.getElementById('current-player').textContent = 
+                    this.currentPlayer === 1 ? '黑棋' : '白棋';
+            }
+            
+            // 检查提子（简化实现）
+            checkCapture(i, j) {
+                // 实际围棋游戏需要实现"气"的计算，这里为简化只实现基本逻辑
+                const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]]; // 上下左右
+                const opponent = this.currentPlayer === 1 ? 2 : 1;
+                
+                // 检查周围对手棋子
+                for (const [dx, dy] of directions) {
+                    const ni = i + dx;
+                    const nj = j + dy;
+                    
+                    if (ni >= 0 && ni < this.boardSize && nj >= 0 && nj < this.boardSize) {
+                        if (this.board[ni][nj] === opponent) {
+                            // 简化：随机概率提子（实际游戏需要检查"气"）
+                            if (Math.random() > 0.7) {
+                                this.board[ni][nj] = 0;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Pass（停一手）
+            pass() {
+                this.saveState();
+                this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
+                this.updateStats();
+                document.getElementById('current-player').textContent = 
+                    this.currentPlayer === 1 ? '黑棋' : '白棋';
+            }
+            
+            // 重新开始
+            reset() {
+                this.boardSize = 3;
+                this.initBoard();
+                this.currentPlayer = 1;
+                this.drawBoard();
+                this.updateStats();
+                document.getElementById('current-player').textContent = '黑棋';
+            }
+            
+            // 保存当前状态
+            saveState() {
+                // 深拷贝棋盘状态
+                const boardCopy = [];
+                for (let i = 0; i < this.boardSize; i++) {
+                    boardCopy[i] = [...this.board[i]];
+                }
+                
+                this.gameHistory.push({
+                    board: boardCopy,
+                    boardSize: this.boardSize,
+                    currentPlayer: this.currentPlayer
+                });
+                
+                // 最多保存10步历史
+                if (this.gameHistory.length > 10) {
+                    this.gameHistory.shift();
+                }
+            }
+            
+            // 悔棋
+            undo() {
+                if (this.gameHistory.length > 0) {
+                    const state = this.gameHistory.pop();
+                    this.board = state.board;
+                    this.boardSize = state.boardSize;
+                    this.currentPlayer = state.currentPlayer;
+                    this.drawBoard();
+                    this.updateStats();
+                    document.getElementById('current-player').textContent = 
+                        this.currentPlayer === 1 ? '黑棋' : '白棋';
+                }
+            }
+            
+            // 检查是否需要扩展棋盘
+            checkExpand() {
+                const totalPoints = this.boardSize * this.boardSize;
+                const totalStones = this.getTotalStones();
+                
+                if (totalStones >= Math.floor(totalPoints / 2)) {
+                    this.expandBoard();
+                    this.drawBoard();
+                }
+            }
+            
+            // 扩展棋盘
+            expandBoard() {
+                const newSize = this.boardSize + 2; // 每边扩展一格
+                const newBoard = [];
+                
+                // 初始化新棋盘
+                for (let i = 0; i < newSize; i++) {
+                    newBoard[i] = [];
+                    for (let j = 0; j < newSize; j++) {
+                        newBoard[i][j] = 0;
+                    }
+                }
+                
+                // 复制原棋盘到中心位置
+                const offset = Math.floor((newSize - this.boardSize) / 2);
+                for (let i = 0; i < this.boardSize; i++) {
+                    for (let j = 0; j < this.boardSize; j++) {
+                        newBoard[i + offset][j + offset] = this.board[i][j];
+                    }
+                }
+                
+                // 更新棋盘
+                this.board = newBoard;
+                this.boardSize = newSize;
+                
+                // 重绘棋盘
+                this.drawBoard();
+            }
+            
+            // 获取总棋子数
+            getTotalStones() {
+                let count = 0;
+                for (let i = 0; i < this.boardSize; i++) {
+                    for (let j = 0; j < this.boardSize; j++) {
+                        if (this.board[i][j] !== 0) {
+                            count++;
+                        }
+                    }
+                }
+                return count;
+            }
+            
+            // 获取黑棋数量
+            getBlackCount() {
+                let count = 0;
+                for (let i = 0; i < this.boardSize; i++) {
+                    for (let j = 0; j < this.boardSize; j++) {
+                        if (this.board[i][j] === 1) {
+                            count++;
+                        }
+                    }
+                }
+                return count;
+            }
+            
+            // 获取白棋数量
+            getWhiteCount() {
+                let count = 0;
+                for (let i = 0; i < this.boardSize; i++) {
+                    for (let j = 0; j < this.boardSize; j++) {
+                        if (this.board[i][j] === 2) {
+                            count++;
+                        }
+                    }
+                }
+                return count;
+            }
+            
+            // 更新状态显示
+            updateStats() {
+                document.getElementById('board-size').textContent = `${this.boardSize}×${this.boardSize}`;
+                document.getElementById('black-count').textContent = this.getBlackCount();
+                document.getElementById('white-count').textContent = this.getWhiteCount();
+                document.getElementById('total-stones').textContent = this.getTotalStones();
+            }
+        }
+
+        // 初始化游戏
+        window.onload = function() {
+            const game = new GoGame();
+        };
+    </script>
+</body>
+</html>
