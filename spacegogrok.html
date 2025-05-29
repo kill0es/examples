@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>无限扩展围棋游戏</title>
+    <style>
+        #board {
+            display: grid;
+            grid-template-columns: repeat(19, 50px);
+            grid-template-rows: repeat(19, 50px);
+            width: 950px;
+            height: 950px;
+            margin: auto;
+        }
+        #board > div {
+            width: 50px;
+            height: 50px;
+            border: 1px solid #ccc;
+            position: relative;
+        }
+        .stone {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            position: absolute;
+            top: 5px;
+            left: 5px;
+        }
+        .stone.B {
+            background: black;
+        }
+        .stone.W {
+            background: white;
+        }
+        .active {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div id="board"></div>
+    <script>
+        const board = document.getElementById('board');
+        const offset = 9;
+        const stones = {};
+        let currentPlayer = 'B';
+        let currentMax = 1;
+
+        for (let x = -9; x <= 9; x++) {
+            for (let y = -9; y <= 9; y++) {
+                const div = document.createElement('div');
+                div.dataset.x = x;
+                div.dataset.y = y;
+                div.style.gridRowStart = y + offset + 1;
+                div.style.gridColumnStart = x + offset + 1;
+                board.appendChild(div);
+            }
+        }
+
+        function updateActive() {
+            const allDivs = board.querySelectorAll('div');
+            allDivs.forEach(div => {
+                const x = parseInt(div.dataset.x);
+                const y = parseInt(div.dataset.y);
+                if (Math.abs(x) <= currentMax && Math.abs(y) <= currentMax) {
+                    div.classList.add('active');
+                } else {
+                    div.classList.remove('active');
+                }
+            });
+        }
+        updateActive();
+
+        function getNeighbors(x, y) {
+            return [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]];
+        }
+
+        function getGroup(startX, startY, color) {
+            const group = [];
+            const visited = new Set();
+            const queue = [[startX, startY]];
+            while (queue.length > 0) {
+                const [cx, cy] = queue.shift();
+                const key = `${cx},${cy}`;
+                if (visited.has(key)) continue;
+                visited.add(key);
+                if (stones[key] === color) {
+                    group.push([cx, cy]);
+                    const neighbors = getNeighbors(cx, cy);
+                    for (const [nx, ny] of neighbors) {
+                        const nkey = `${nx},${ny}`;
+                        if (!visited.has(nkey) && stones[nkey] === color) {
+                            queue.push([nx, ny]);
+                        }
+                    }
+                }
+            }
+            return group;
+        }
+
+        function getLiberties(group) {
+            const liberties = new Set();
+            for (const [gx, gy] of group) {
+                const neighbors = getNeighbors(gx, gy);
+                for (const [nx, ny] of neighbors) {
+                    const nkey = `${nx},${ny}`;
+                    if (!(nkey in stones)) {
+                        liberties.add(nkey);
+                    }
+                }
+            }
+            return liberties.size;
+        }
+
+        board.addEventListener('click', function(event) {
+            const div = event.target;
+            if (div.tagName === 'DIV' && div.classList.contains('active') && div.children.length === 0) {
+                const x = parseInt(div.dataset.x);
+                const y = parseInt(div.dataset.y);
+                const key = `${x},${y}`;
+                if (!(key in stones)) {
+                    stones[key] = currentPlayer;
+                    const stoneDiv = document.createElement('div');
+                    stoneDiv.className = `stone ${currentPlayer}`;
+                    div.appendChild(stoneDiv);
+
+                    const opponent = currentPlayer === 'B' ? 'W' : 'B';
+                    const neighbors = getNeighbors(x, y);
+                    const checked = new Set();
+                    for (const [nx, ny] of neighbors) {
+                        const nkey = `${nx},${ny}`;
+                        if (stones[nkey] === opponent && !checked.has(nkey)) {
+                            const group = getGroup(nx, ny, opponent);
+                            group.forEach(([gx, gy]) => checked.add(`${gx},${gy}`));
+                            if (getLiberties(group) === 0) {
+                                group.forEach(([gx, gy]) => {
+                                    const gkey = `${gx},${gy}`;
+                                    delete stones[gkey];
+                                    const gdiv = document.querySelector(`[data-x="${gx}"][data-y="${gy}"]`);
+                                    gdiv.innerHTML = '';
+                                });
+                            }
+                        }
+                    }
+
+                    currentPlayer = currentPlayer === 'B' ? 'W' : 'B';
+                    const totalGrids = (2 * currentMax + 1) ** 2;
+                    const totalStones = Object.values(stones).length;
+                    if (totalStones >= Math.ceil(totalGrids / 2)) {
+                        currentMax += 1;
+                        updateActive();
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
